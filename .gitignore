@@ -1,3 +1,5 @@
-modelweights/yolov3.weights
-modelweights/.yolov3.weights
-modelweights/model.h5
+modelweights/*.weights
+modelweights/*.h5
+model-build.log
+*__pycache__*
+yolov3.weights

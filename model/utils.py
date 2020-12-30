@@ -1,10 +1,67 @@
 import numpy as np
+import struct
 from numpy import expand_dims
 from keras.models import load_model
 from keras.preprocessing.image import load_img
 from keras.preprocessing.image import img_to_array
 from matplotlib import pyplot
 from matplotlib.patches import Rectangle
+import cv2
+
+
+class WeightReader:
+    def __init__(self, weight_file):
+        with open(weight_file, 'rb') as w_f:
+            major,    = struct.unpack('i', w_f.read(4))
+            minor,    = struct.unpack('i', w_f.read(4))
+            revision, = struct.unpack('i', w_f.read(4))
+            if (major * 10 + minor) >= 2 and major < 1000 and minor < 1000:
+                w_f.read(8)
+            else:
+                w_f.read(4)
+            transpose = (major > 1000) or (minor > 1000)
+            binary = w_f.read()
+        self.offset = 0
+        self.all_weights = np.frombuffer(binary, dtype='float32')
+
+    def read_bytes(self, size):
+        self.offset = self.offset + size
+        return self.all_weights[self.offset - size:self.offset]
+
+    def load_weights(self, model):
+        for i in range(106):
+            try:
+                conv_layer = model.get_layer('conv_' + str(i))
+                print("loading weights of convolution #" + str(i))
+                if i not in [81, 93, 105]:
+                    norm_layer = model.get_layer('bnorm_' + str(i))
+                    size = np.prod(norm_layer.get_weights()[0].shape)
+                    beta = self.read_bytes(size)  # bias
+                    gamma = self.read_bytes(size)  # scale
+                    mean = self.read_bytes(size)  # mean
+                    var = self.read_bytes(size)  # variance
+                    weights = norm_layer.set_weights([gamma, beta, mean, var])
+                if len(conv_layer.get_weights()) > 1:
+                    bias = self.read_bytes(
+                        np.prod(conv_layer.get_weights()[1].shape))
+                    kernel = self.read_bytes(
+                        np.prod(conv_layer.get_weights()[0].shape))
+                    kernel = kernel.reshape(
+                        list(reversed(conv_layer.get_weights()[0].shape)))
+                    kernel = kernel.transpose([2, 3, 1, 0])
+                    conv_layer.set_weights([kernel, bias])
+                else:
+                    kernel = self.read_bytes(
+                        np.prod(conv_layer.get_weights()[0].shape))
+                    kernel = kernel.reshape(
+                        list(reversed(conv_layer.get_weights()[0].shape)))
+                    kernel = kernel.transpose([2, 3, 1, 0])
+                    conv_layer.set_weights([kernel])
+            except ValueError:
+                print("no convolution #" + str(i))
+
+    def reset(self):
+        self.offset = 0
 
 
 class BoundBox:
@@ -128,6 +185,7 @@ def do_nms(boxes, nms_thresh):
 
 
 def load_image_pixels(filename, shape):
+    """Load and prepare an image."""
     # load the image to get its shape
     image = load_img(filename)
     width, height = image.size
@@ -142,10 +200,9 @@ def load_image_pixels(filename, shape):
     image = expand_dims(image, 0)
     return image, width, height
 
-# get all of the results above a threshold
-
 
 def get_boxes(boxes, labels, thresh):
+    """Get all boxes above given threshold."""
     v_boxes, v_labels, v_scores = list(), list(), list()
     # enumerate all boxes
     for box in boxes:
@@ -159,10 +216,9 @@ def get_boxes(boxes, labels, thresh):
                 # don't break, many labels may trigger for one box
     return v_boxes, v_labels, v_scores
 
-# draw all results
-
 
 def draw_boxes(filename, v_boxes, v_labels, v_scores):
+    """Draw results on source image using matplotlib."""
     # load the image
     data = pyplot.imread(filename)
     # plot the image
@@ -185,3 +241,19 @@ def draw_boxes(filename, v_boxes, v_labels, v_scores):
         pyplot.text(x1, y1, label, color='white')
     # show the plot
     pyplot.show()
+
+
+def draw_boxes_cv2(image, v_boxes, v_labels, v_scores, rec_color=(255,0,0), text_color=(0,0,255)):
+    """Draw results on source image and annotate using cv2.
+
+    Modifies image inplace.
+    """
+    for i in range(len(v_boxes)):
+        box = v_boxes[i]
+        # get coordinates
+        y1, x1, y2, x2 = box.ymin, box.xmin, box.ymax, box.xmax
+        # calculate width and height of the box
+        width, height = x2 - x1, y2 - y1
+        # create the shape
+        cv2.rectangle(image, (x1, y1), (x2, y2), color=rec_color)
+        cv2.putText(image, "%s (%.3f)" % (v_labels[i], v_scores[i]), (x1, y1), fontFace=1, fontScale=1, color=text_color)
