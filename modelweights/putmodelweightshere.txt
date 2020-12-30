@@ -1,0 +1,1 @@
+run setup.sh or setup.bat to download and place weights here.
