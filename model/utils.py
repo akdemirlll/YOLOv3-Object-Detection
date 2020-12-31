@@ -7,6 +7,16 @@ from keras.preprocessing.image import img_to_array
 from matplotlib import pyplot
 from matplotlib.patches import Rectangle
 import cv2
+import time
+
+def timit(func):
+    def wrapper(*args, **kwargs):
+        then = time.time()
+        res = func(*args, **kwargs)
+        now = time.time()
+        print(func.__name__, 'executed in', round(now - then, 2), 'seconds.')
+        return res
+    return wrapper
 
 
 class WeightReader:
@@ -91,7 +101,7 @@ class BoundBox:
 def _sigmoid(x):
     return 1. / (1. + np.exp(-x))
 
-
+# @timit
 def decode_netout(netout, anchors, obj_thresh, net_h, net_w):
     grid_h, grid_w = netout.shape[:2]
     nb_box = 3
@@ -125,6 +135,7 @@ def decode_netout(netout, anchors, obj_thresh, net_h, net_w):
     return boxes
 
 
+# @timit
 def correct_yolo_boxes(boxes, image_h, image_w, net_h, net_w):
     new_w, new_h = net_w, net_h
     for i in range(len(boxes)):
