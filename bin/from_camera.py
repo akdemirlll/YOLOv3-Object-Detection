@@ -9,8 +9,14 @@ from model.yolov3 import LABELS, ANCHORS
 if __name__ == '__main__':
     # load yolov3 model
     no_nms = "--no-nms" in sys.argv
+    single_anchor = "--single-anchor" in sys.argv
     if no_nms:
         print("WARNING: Non-max suppression is disabled.\n")
+
+
+    if single_anchor:
+        print("WARNING: Using single anchor.\n")
+
     model = load_model('modelweights/model.h5')
     # define the expected input shape for the model
     input_w, input_h = 416, 416
@@ -29,6 +35,8 @@ if __name__ == '__main__':
         image = image.reshape(1, input_w, input_h, 3)
 
         yhat = model.predict(image / 255.)
+        # import pdb; pdb.set_trace()
+        # print(yhat)
 
         class_threshold = 0.6
         boxes = list()
@@ -36,6 +44,8 @@ if __name__ == '__main__':
             # decode the output of the network
             boxes += decode_netout(yhat[i][0], ANCHORS[i],
                                    class_threshold, input_h, input_w)
+            if single_anchor:
+                break
         correct_yolo_boxes(boxes, image_h, image_w, input_h, input_w)
         # import pdb; pdb.set_trace()
         if not no_nms:
