@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
 
     if single_anchor:
-        print("WARNING: Using single anchor.\n")
+        print("WARNING: Using single anchor. This will impact detection performance.\n")
 
     model = load_model('modelweights/model.h5')
     # define the expected input shape for the model
