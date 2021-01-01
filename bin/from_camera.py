@@ -1,23 +1,37 @@
 import sys
 sys.path.append('.')
 import cv2
-from model.utils import decode_netout, correct_yolo_boxes, do_nms, get_boxes, draw_boxes_cv2
-from keras.models import load_model
+from model.utils import decode_netout, correct_yolo_boxes, do_nms, get_boxes, draw_boxes_cv2, timit
+from keras.models import load_model, Model
 from model.yolov3 import LABELS, ANCHORS
 
 
 if __name__ == '__main__':
-    # load yolov3 model
+    # check args
     no_nms = "--no-nms" in sys.argv
-    single_anchor = "--single-anchor" in sys.argv
+    shallow = "--shallow" in sys.argv
+    profile = "--profile" in sys.argv
+
     if no_nms:
         print("WARNING: Non-max suppression is disabled.\n")
 
+    if shallow:
+        print("WARNING: Using shallow predictions. This may impact detection performance.\n")
 
-    if single_anchor:
-        print("WARNING: Using single anchor. This will impact detection performance.\n")
-
+    # load yolov3 model
     model = load_model('modelweights/model.h5')
+    model.summary()
+
+    if shallow:
+        model = Model(inputs=model.inputs, outputs=model.get_layer('conv_81').get_output_at(0))
+
+    if profile:
+        # allow profiling
+        decode_netout = timit(decode_netout)
+        do_nms = timit(do_nms)
+        model.predict = timit(model.predict)
+        draw_boxes_cv2 = timit(draw_boxes_cv2)
+
     # define the expected input shape for the model
     input_w, input_h = 416, 416
     # define our new photo
@@ -35,6 +49,9 @@ if __name__ == '__main__':
         image = image.reshape(1, input_w, input_h, 3)
 
         yhat = model.predict(image / 255.)
+
+        if shallow:
+            yhat = [yhat]
         # import pdb; pdb.set_trace()
         # print(yhat)
 
@@ -44,8 +61,6 @@ if __name__ == '__main__':
             # decode the output of the network
             boxes += decode_netout(yhat[i][0], ANCHORS[i],
                                    class_threshold, input_h, input_w)
-            if single_anchor:
-                break
         correct_yolo_boxes(boxes, image_h, image_w, input_h, input_w)
         # import pdb; pdb.set_trace()
         if not no_nms:
