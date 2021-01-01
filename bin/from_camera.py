@@ -20,10 +20,12 @@ if __name__ == '__main__':
 
     # load yolov3 model
     model = load_model('modelweights/model.h5')
-    model.summary()
 
     if shallow:
         model = Model(inputs=model.inputs, outputs=model.get_layer('conv_81').get_output_at(0))
+
+
+    model.summary()
 
     if profile:
         # allow profiling
