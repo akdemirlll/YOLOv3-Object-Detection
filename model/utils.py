@@ -254,11 +254,16 @@ def draw_boxes(filename, v_boxes, v_labels, v_scores):
     pyplot.show()
 
 
-def draw_boxes_cv2(image, v_boxes, v_labels, v_scores, rec_color=(255,0,0), text_color=(0,0,255)):
+def draw_boxes_cv2(image, v_boxes, v_labels, v_scores, rec_color=(255,0,0), text_color=(0,0,255), rectangle_kwargs=None, text_kwargs=None):
     """Draw results on source image and annotate using cv2.
 
     Modifies image inplace.
     """
+    if rectangle_kwargs is None:
+        rectangle_kwargs = {}
+    if text_kwargs is None:
+        text_kwargs = {}
+
     for i in range(len(v_boxes)):
         box = v_boxes[i]
         # get coordinates
@@ -266,5 +271,5 @@ def draw_boxes_cv2(image, v_boxes, v_labels, v_scores, rec_color=(255,0,0), text
         # calculate width and height of the box
         width, height = x2 - x1, y2 - y1
         # create the shape
-        cv2.rectangle(image, (x1, y1), (x2, y2), color=rec_color)
-        cv2.putText(image, "%s (%.3f)" % (v_labels[i], v_scores[i]), (x1, y1), fontFace=1, fontScale=1, color=text_color)
+        cv2.rectangle(image, (x1, y1), (x2, y2), color=rec_color, **rectangle_kwargs)
+        cv2.putText(image, "%s (%.3f)" % (v_labels[i], v_scores[i]), (x1, y1), color=text_color, **text_kwargs)
